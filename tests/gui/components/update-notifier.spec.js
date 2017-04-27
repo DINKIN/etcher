@@ -1,148 +1,203 @@
 'use strict';
 
 const m = require('mochainon');
+const _ = require('lodash');
 const angular = require('angular');
 const units = require('../../../lib/shared/units');
-const settings = require('../../../lib/gui/models/settings');
+const release = require('../../../lib/shared/release');
 require('angular-mocks');
 
 describe('Browser: UpdateNotifier', function() {
 
   beforeEach(angular.mock.module(
-    require('../../../lib/gui/components/update-notifier/update-notifier')
+    require('../../../lib/gui/components/update-notifier')
   ));
 
   describe('UpdateNotifierService', function() {
 
+    describe('.UPDATE_NOTIFIER_SLEEP_DAYS', function() {
+
+      let UpdateNotifierService;
+
+      beforeEach(angular.mock.inject(function(_UpdateNotifierService_) {
+        UpdateNotifierService = _UpdateNotifierService_;
+      }));
+
+      it('should be an integer', function() {
+        m.chai.expect(_.isInteger(UpdateNotifierService.UPDATE_NOTIFIER_SLEEP_DAYS)).to.be.true;
+      });
+
+      it('should be greater than 0', function() {
+        m.chai.expect(UpdateNotifierService.UPDATE_NOTIFIER_SLEEP_DAYS > 0).to.be.true;
+      });
+
+    });
+
     describe('.shouldCheckForUpdates()', function() {
 
       let UpdateNotifierService;
-      let UPDATE_NOTIFIER_SLEEP_DAYS;
 
-      beforeEach(angular.mock.inject(function(_UpdateNotifierService_, _UPDATE_NOTIFIER_SLEEP_DAYS_) {
+      beforeEach(angular.mock.inject(function(_UpdateNotifierService_) {
         UpdateNotifierService = _UpdateNotifierService_;
-        UPDATE_NOTIFIER_SLEEP_DAYS = _UPDATE_NOTIFIER_SLEEP_DAYS_;
       }));
 
-      describe('given ignoreSleepUpdateCheck is false', function() {
+      describe('given `lastSleptUpdateNotifier` is undefined', function() {
 
-        beforeEach(function() {
-          this.ignoreSleepUpdateCheck = false;
+        it('should return true if releaseType is production', function() {
+          const result = UpdateNotifierService.shouldCheckForUpdates({
+            lastSleptUpdateNotifier: undefined,
+            releaseType: release.RELEASE_TYPE.PRODUCTION
+          });
+
+          m.chai.expect(result).to.be.true;
         });
 
-        describe('given the `sleepUpdateCheck` is disabled', function() {
-
-          beforeEach(function() {
-            settings.set('sleepUpdateCheck', false);
+        it('should return true if releaseType is snapshot', function() {
+          const result = UpdateNotifierService.shouldCheckForUpdates({
+            lastSleptUpdateNotifier: undefined,
+            releaseType: release.RELEASE_TYPE.SNAPSHOT
           });
 
-          it('should return true', function() {
-            const result = UpdateNotifierService.shouldCheckForUpdates({
-              ignoreSleepUpdateCheck: this.ignoreSleepUpdateCheck
-            });
-
-            m.chai.expect(result).to.be.true;
-          });
-
+          m.chai.expect(result).to.be.true;
         });
 
-        describe('given the `sleepUpdateCheck` is enabled', function() {
-
-          beforeEach(function() {
-            settings.set('sleepUpdateCheck', true);
+        it('should return true if releaseType is unknown', function() {
+          const result = UpdateNotifierService.shouldCheckForUpdates({
+            lastSleptUpdateNotifier: undefined,
+            releaseType: release.RELEASE_TYPE.UNKNOWN
           });
 
-          describe('given the `lastUpdateNotify` was never updated', function() {
-
-            beforeEach(function() {
-              settings.set('lastUpdateNotify', undefined);
-            });
-
-            it('should return true', function() {
-              const result = UpdateNotifierService.shouldCheckForUpdates({
-                ignoreSleepUpdateCheck: this.ignoreSleepUpdateCheck
-              });
-
-              m.chai.expect(result).to.be.true;
-            });
-
-          });
-
-          describe('given the `lastUpdateNotify` was very recently updated', function() {
-
-            beforeEach(function() {
-              settings.set('lastUpdateNotify', Date.now() + 1000);
-            });
-
-            it('should return false', function() {
-              const result = UpdateNotifierService.shouldCheckForUpdates({
-                ignoreSleepUpdateCheck: this.ignoreSleepUpdateCheck
-              });
-
-              m.chai.expect(result).to.be.false;
-            });
-
-          });
-
-          describe('given the `lastUpdateNotify` was updated long ago', function() {
-
-            beforeEach(function() {
-              const SLEEP_MS = units.daysToMilliseconds(UPDATE_NOTIFIER_SLEEP_DAYS);
-              settings.set('lastUpdateNotify', Date.now() + SLEEP_MS + 1000);
-            });
-
-            it('should return true', function() {
-              const result = UpdateNotifierService.shouldCheckForUpdates({
-                ignoreSleepUpdateCheck: this.ignoreSleepUpdateCheck
-              });
-
-              m.chai.expect(result).to.be.true;
-            });
-
-            it('should unset the `sleepUpdateCheck` setting', function() {
-              m.chai.expect(settings.get('sleepUpdateCheck')).to.be.true;
-
-              UpdateNotifierService.shouldCheckForUpdates({
-                ignoreSleepUpdateCheck: this.ignoreSleepUpdateCheck
-              });
-
-              m.chai.expect(settings.get('sleepUpdateCheck')).to.be.false;
-            });
-
-          });
-
+          m.chai.expect(result).to.be.true;
         });
 
       });
 
-      describe('given ignoreSleepUpdateCheck is true', function() {
+      describe('given the `lastSleptUpdateNotifier` was very recently updated', function() {
 
-        beforeEach(function() {
-          this.ignoreSleepUpdateCheck = true;
+        it('should return false if releaseType is production', function() {
+          const result = UpdateNotifierService.shouldCheckForUpdates({
+            lastSleptUpdateNotifier: Date.now() - 1000,
+            releaseType: release.RELEASE_TYPE.PRODUCTION
+          });
+
+          m.chai.expect(result).to.be.false;
         });
 
-        describe('given the `sleepUpdateCheck` is enabled', function() {
-
-          beforeEach(function() {
-            settings.set('sleepUpdateCheck', true);
+        it('should return true if releaseType is snapshot', function() {
+          const result = UpdateNotifierService.shouldCheckForUpdates({
+            lastSleptUpdateNotifier: Date.now() - 1000,
+            releaseType: release.RELEASE_TYPE.SNAPSHOT
           });
 
-          describe('given the `lastUpdateNotify` was very recently updated', function() {
+          m.chai.expect(result).to.be.true;
+        });
 
-            beforeEach(function() {
-              settings.set('lastUpdateNotify', Date.now() + 1000);
-            });
-
-            it('should return true', function() {
-              const result = UpdateNotifierService.shouldCheckForUpdates({
-                ignoreSleepUpdateCheck: this.ignoreSleepUpdateCheck
-              });
-
-              m.chai.expect(result).to.be.true;
-            });
-
+        it('should return true if releaseType is unknown', function() {
+          const result = UpdateNotifierService.shouldCheckForUpdates({
+            lastSleptUpdateNotifier: Date.now() - 1000,
+            releaseType: release.RELEASE_TYPE.UNKNOWN
           });
 
+          m.chai.expect(result).to.be.true;
+        });
+
+      });
+
+      describe('given the `lastSleptUpdateNotifier` was updated in the future', function() {
+
+        it('should return false if releaseType is production', function() {
+          const result = UpdateNotifierService.shouldCheckForUpdates({
+            lastSleptUpdateNotifier: Date.now() + 1000,
+            releaseType: release.RELEASE_TYPE.PRODUCTION
+          });
+
+          m.chai.expect(result).to.be.false;
+        });
+
+        it('should return true if releaseType is snapshot', function() {
+          const result = UpdateNotifierService.shouldCheckForUpdates({
+            lastSleptUpdateNotifier: Date.now() + 1000,
+            releaseType: release.RELEASE_TYPE.SNAPSHOT
+          });
+
+          m.chai.expect(result).to.be.true;
+        });
+
+        it('should return true if releaseType is unknown', function() {
+          const result = UpdateNotifierService.shouldCheckForUpdates({
+            lastSleptUpdateNotifier: Date.now() + 1000,
+            releaseType: release.RELEASE_TYPE.UNKNOWN
+          });
+
+          m.chai.expect(result).to.be.true;
+        });
+
+      });
+
+      describe('given the `lastSleptUpdateNotifier` was updated far in the future', function() {
+
+        it('should return false if releaseType is production', function() {
+          const SLEEP_MS = units.daysToMilliseconds(UpdateNotifierService.UPDATE_NOTIFIER_SLEEP_DAYS);
+          const result = UpdateNotifierService.shouldCheckForUpdates({
+            lastSleptUpdateNotifier: Date.now() + SLEEP_MS + 1000,
+            releaseType: release.RELEASE_TYPE.PRODUCTION
+          });
+
+          m.chai.expect(result).to.be.false;
+        });
+
+        it('should return true if releaseType is snapshot', function() {
+          const SLEEP_MS = units.daysToMilliseconds(UpdateNotifierService.UPDATE_NOTIFIER_SLEEP_DAYS);
+          const result = UpdateNotifierService.shouldCheckForUpdates({
+            lastSleptUpdateNotifier: Date.now() + SLEEP_MS + 1000,
+            releaseType: release.RELEASE_TYPE.SNAPSHOT
+          });
+
+          m.chai.expect(result).to.be.true;
+        });
+
+        it('should return true if releaseType is unknown', function() {
+          const SLEEP_MS = units.daysToMilliseconds(UpdateNotifierService.UPDATE_NOTIFIER_SLEEP_DAYS);
+          const result = UpdateNotifierService.shouldCheckForUpdates({
+            lastSleptUpdateNotifier: Date.now() + SLEEP_MS + 1000,
+            releaseType: release.RELEASE_TYPE.UNKNOWN
+          });
+
+          m.chai.expect(result).to.be.true;
+        });
+
+      });
+
+      describe('given the `lastSleptUpdateNotifier` was updated long ago', function() {
+
+        it('should return true if releaseType is production', function() {
+          const SLEEP_MS = units.daysToMilliseconds(UpdateNotifierService.UPDATE_NOTIFIER_SLEEP_DAYS);
+          const result = UpdateNotifierService.shouldCheckForUpdates({
+            lastSleptUpdateNotifier: Date.now() - SLEEP_MS - 1000,
+            releaseType: release.RELEASE_TYPE.PRODUCTION
+          });
+
+          m.chai.expect(result).to.be.true;
+        });
+
+        it('should return true if releaseType is snapshot', function() {
+          const SLEEP_MS = units.daysToMilliseconds(UpdateNotifierService.UPDATE_NOTIFIER_SLEEP_DAYS);
+          const result = UpdateNotifierService.shouldCheckForUpdates({
+            lastSleptUpdateNotifier: Date.now() - SLEEP_MS - 1000,
+            releaseType: release.RELEASE_TYPE.SNAPSHOT
+          });
+
+          m.chai.expect(result).to.be.true;
+        });
+
+        it('should return true if releaseType is unknown', function() {
+          const SLEEP_MS = units.daysToMilliseconds(UpdateNotifierService.UPDATE_NOTIFIER_SLEEP_DAYS);
+          const result = UpdateNotifierService.shouldCheckForUpdates({
+            lastSleptUpdateNotifier: Date.now() - SLEEP_MS - 1000,
+            releaseType: release.RELEASE_TYPE.UNKNOWN
+          });
+
+          m.chai.expect(result).to.be.true;
         });
 
       });
